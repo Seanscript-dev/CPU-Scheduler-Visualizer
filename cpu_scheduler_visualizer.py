@@ -559,10 +559,10 @@ class SchedulerVisualizerApp:
         )
         self.clear_btn.grid(row=1, column=0, padx=2, pady=2, sticky='ew')
 
-        self.explanations_btn = tk.Button(
+        self.process_btn = tk.Button(
             self.btn_frame,
-            text="Explanations",
-            command=self.show_explanations,
+            text="Process",
+            command=self.show_process,
             font=('Arial', 10, 'bold'),
             bg='#28A745',
             fg='white',
@@ -570,7 +570,7 @@ class SchedulerVisualizerApp:
             cursor='hand2',
             pady=8
         )
-        self.explanations_btn.grid(row=1, column=1, padx=2, pady=2, sticky='ew')
+        self.process_btn.grid(row=1, column=1, padx=2, pady=2, sticky='ew')
 
         # Add hover effects
         self.generate_btn.bind("<Enter>", lambda e: self.generate_btn.config(bg='#005a9e'))
@@ -582,8 +582,8 @@ class SchedulerVisualizerApp:
         self.clear_btn.bind("<Enter>", lambda e: self.clear_btn.config(bg='#c82333'))
         self.clear_btn.bind("<Leave>", lambda e: self.clear_btn.config(bg='#DC3545'))
 
-        self.explanations_btn.bind("<Enter>", lambda e: self.explanations_btn.config(bg='#218838'))
-        self.explanations_btn.bind("<Leave>", lambda e: self.explanations_btn.config(bg='#28A745'))
+        self.process_btn.bind("<Enter>", lambda e: self.process_btn.config(bg='#218838'))
+        self.process_btn.bind("<Leave>", lambda e: self.process_btn.config(bg='#28A745'))
         
         # Scrollable process input area
         input_canvas = tk.Canvas(left_panel, bg=self.panel_bg, highlightthickness=0)
@@ -1333,10 +1333,10 @@ class SchedulerVisualizerApp:
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to export results:\n{str(e)}")
 
-    def show_explanations(self):
+    def show_process(self):
         """Show step-by-step explanation of the scheduling process"""
         if not self.processes or not self.timeline:
-            messagebox.showwarning("No Data", "Run a simulation first to see explanations.")
+            messagebox.showwarning("No Data", "Run a simulation first to see process.")
             return
 
         # Create explanation window
