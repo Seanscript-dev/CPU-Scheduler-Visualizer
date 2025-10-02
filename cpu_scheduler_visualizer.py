@@ -602,7 +602,7 @@ class SchedulerVisualizerApp:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Bind mouse wheel
-        input_canvas.bind_all("<MouseWheel>", lambda e: input_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        input_canvas.bind("<MouseWheel>", lambda e: input_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
         
         # Initial process inputs
         self.update_process_inputs()
@@ -670,7 +670,13 @@ class SchedulerVisualizerApp:
             bd=2
         )
         self.gantt_canvas.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
+
+        # Horizontal scrollbar for Gantt chart
+        self.gantt_hsb = tk.Scrollbar(center_panel, orient="horizontal", command=self.gantt_canvas.xview)
+        self.gantt_canvas.configure(xscrollcommand=self.gantt_hsb.set)
+        # Bind mouse wheel for horizontal scrolling
+        self.gantt_canvas.bind("<MouseWheel>", lambda e: self.gantt_canvas.xview_scroll(int(-1*(e.delta/120)), "units"))
+
         # Status label
         self.status_label = tk.Label(
             center_panel,
@@ -1104,37 +1110,42 @@ class SchedulerVisualizerApp:
         """Animate the Gantt chart"""
         if not self.timeline:
             return
-        
+
         self.animation_running = True
         self.gantt_canvas.config(bg='#30394c')
         self.gantt_canvas.delete("all")
-        
+
         # Calculate dimensions
         canvas_width = self.gantt_canvas.winfo_width()
         canvas_height = self.gantt_canvas.winfo_height()
-        
+
         if canvas_width <= 1:  # Canvas not yet rendered
             canvas_width = 800
             canvas_height = 200
-        
+
         margin = 50
-        chart_width = canvas_width - 2 * margin
-        chart_height = canvas_height - 2 * margin
-        
+        self.pixels_per_unit = 20  # Fixed pixels per time unit to prevent shrinking
+
         # Get max time
-        max_time = max(t['end'] for t in self.timeline)
-        time_scale = chart_width / max_time if max_time > 0 else 1
-        
+        max_time = max(t['end'] for t in self.timeline) if self.timeline else 0
+        self.required_width = margin + max_time * self.pixels_per_unit + margin
+
+        # Set scrollregion to full chart width to allow scrolling
+        self.gantt_canvas.configure(scrollregion=(0, 0, self.required_width, canvas_height))
+
+        # Always hide horizontal scrollbar
+        self.gantt_hsb.pack_forget()
+
         # Draw axes
         self.gantt_canvas.create_line(
             margin, canvas_height - margin,
-            canvas_width - margin, canvas_height - margin,
+            self.required_width - margin, canvas_height - margin,
             width=2, fill='white'
         )
-        
+
         # Draw time labels
         for i in range(0, max_time + 1, max(1, max_time // 10)):
-            x = margin + i * time_scale
+            x = margin + i * self.pixels_per_unit
             self.gantt_canvas.create_line(
                 x, canvas_height - margin,
                 x, canvas_height - margin + 10,
@@ -1145,7 +1156,7 @@ class SchedulerVisualizerApp:
                 text=str(i), font=('Arial', 9),
                 fill='white'
             )
-        
+
         # Animate timeline
         self.current_animation_index = 0
         self.animate_next_block()
@@ -1155,29 +1166,23 @@ class SchedulerVisualizerApp:
         if self.current_animation_index >= len(self.timeline):
             self.animation_running = False
             return
-        
+
         block = self.timeline[self.current_animation_index]
-        
-        canvas_width = self.gantt_canvas.winfo_width()
+
         canvas_height = self.gantt_canvas.winfo_height()
-        
-        if canvas_width <= 1:
-            canvas_width = 800
+
+        if canvas_height <= 1:
             canvas_height = 200
-        
+
         margin = 50
-        chart_width = canvas_width - 2 * margin
         chart_height = canvas_height - 2 * margin
-        
-        max_time = max(t['end'] for t in self.timeline)
-        time_scale = chart_width / max_time if max_time > 0 else 1
-        
-        # Calculate block position
-        x1 = margin + block['start'] * time_scale
-        x2 = margin + block['end'] * time_scale
+
+        # Calculate block position using fixed pixels_per_unit
+        x1 = margin + block['start'] * self.pixels_per_unit
+        x2 = margin + block['end'] * self.pixels_per_unit
         y1 = margin + chart_height * 0.2
         y2 = margin + chart_height * 0.8
-        
+
         # Draw block
         rect_id = self.gantt_canvas.create_rectangle(
             x1, y1, x2, y2,
@@ -1185,7 +1190,7 @@ class SchedulerVisualizerApp:
             outline='black',
             width=2
         )
-        
+
         # Add process label
         label_color = 'white'
         text_id = self.gantt_canvas.create_text(
@@ -1194,7 +1199,7 @@ class SchedulerVisualizerApp:
             font=('Arial', 12, 'bold'),
             fill=label_color
         )
-        
+
         # Add time labels
         self.gantt_canvas.create_text(
             x1, y1 - 10,
@@ -1202,7 +1207,7 @@ class SchedulerVisualizerApp:
             font=('Arial', 9),
             fill='white'
         )
-        
+
         if self.current_animation_index == len(self.timeline) - 1 or \
            self.timeline[self.current_animation_index + 1]['start'] != block['end']:
             self.gantt_canvas.create_text(
@@ -1211,9 +1216,9 @@ class SchedulerVisualizerApp:
                 font=('Arial', 9),
                 fill='white'
             )
-        
+
         self.current_animation_index += 1
-        
+
         # Schedule next animation
         self.root.after(self.animation_speed.get(), self.animate_next_block)
     
@@ -1453,29 +1458,34 @@ class SchedulerVisualizerApp:
         """Restart the simulation"""
         # Clear Gantt chart
         self.gantt_canvas.delete("all")
-        
+
+        # Reset scrollbar
+        self.gantt_hsb.pack_forget()
+        self.gantt_canvas.configure(scrollregion=None)
+        self.gantt_canvas.unbind("<MouseWheel>")
+
         # Clear results table
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
-        
+
         # Clear charts
         self.fig.clear()
         self.chart_canvas.draw()
-        
+
         # Reset summary
         self.avg_tat_label.config(text="Average Turnaround Time: --")
         self.avg_wt_label.config(text="Average Waiting Time: --")
         self.throughput_label.config(text="Throughput: --")
-        
+
         # Reset status
         self.status_label.config(
             text="Ready to simulate. Configure processes and click RUN.",
             fg='#0078D4'
         )
-        
+
         # Clear inputs
         self.clear_inputs()
-        
+
         # Reset variables
         self.processes = []
         self.timeline = []
